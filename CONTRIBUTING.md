@@ -67,6 +67,30 @@ Having good commit messages and PR titles also helps with reviews, scanning the 
 the project, and writing the [*This week in
 Matrix*](https://matrix.org/category/this-week-in-matrix/) updates for the SDK.
 
+## Review process
+
+For starters, some basic rules:
+
+1. Do not force push after a review has started.
+2. Do not mix moves and refactoring with functional changes, those need to be
+   separate commits.
+3. Each commit *must* compile. Otherwise `git bisect` will be rendered useless.
+4. Commits should only introduce test failures if they are proving that a bug
+   exists, new features should never introduce test failures.
+
+### Addressing review comments using fixup commits
+
+So you posted a PR and the maintainers aren't quite happy with it. Here are some
+guidelines to make the maintainers life easier and increase the chances that
+your PR will be reviewed swiftly.
+
+Git has a nice
+
+[fixup]: https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---fixupamendrewordltcommitgt
+[autosquash]: https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autosquash
+
+### Splitting a PR into multiple smaller ones.
+
 ## Sign off
 
 In order to have a concrete record that your contribution is intentional
