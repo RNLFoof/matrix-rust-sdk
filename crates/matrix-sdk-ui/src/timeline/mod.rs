@@ -97,6 +97,7 @@ pub use self::{
     inner::default_event_filter,
     item::{TimelineItem, TimelineItemKind},
     pagination::LiveBackPaginationStatus,
+    pinned_events_loader::MAX_PINNED_EVENTS_CONCURRENT_REQUESTS,
     polls::PollResult,
     traits::RoomExt,
     virtual_item::VirtualTimelineItem,

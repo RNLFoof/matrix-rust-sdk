@@ -12,7 +12,9 @@ use matrix_sdk::{
 use matrix_sdk_base::deserialized_responses::TimelineEvent;
 use matrix_sdk_test::{async_test, JoinedRoomBuilder, StateTestEvent, SyncResponseBuilder, BOB};
 use matrix_sdk_ui::{
-    timeline::{TimelineFocus, TimelineItemContent},
+    timeline::{
+        RoomExt, TimelineFocus, TimelineItemContent, MAX_PINNED_EVENTS_CONCURRENT_REQUESTS,
+    },
     Timeline,
 };
 use ruma::{
@@ -21,7 +23,11 @@ use ruma::{
 };
 use serde_json::json;
 use stream_assert::assert_pending;
-use wiremock::MockServer;
+use tokio::time::sleep;
+use wiremock::{
+    matchers::{header, method, path_regex},
+    Mock, MockServer, ResponseTemplate,
+};
 
 use crate::{mock_event, mock_sync};
 
@@ -633,6 +639,78 @@ async fn test_edited_events_survive_pinned_event_ids_change() {
         assert!(value.is_day_divider());
     });
     assert_pending!(timeline_stream);
+}
+
+#[async_test]
+async fn test_ensure_max_concurrency_is_observed() {
+    let (client, server) = logged_in_client_with_server().await;
+    let room_id = owned_room_id!("!a_room:example.org");
+
+    let pinned_event_ids: Vec<String> = (0..100).map(|idx| format!("${idx}")).collect();
+
+    let joined_room_builder = JoinedRoomBuilder::new(&room_id)
+        // Set up encryption
+        .add_state_event(StateTestEvent::Encryption)
+        // Add 100 pinned events
+        .add_state_event(StateTestEvent::Custom(json!(
+            {
+                "content": {
+                    "pinned": pinned_event_ids
+                },
+                "event_id": "$15139375513VdeRF:localhost",
+                "origin_server_ts": 151393755,
+                "sender": "@example:localhost",
+                "state_key": "",
+                "type": "m.room.pinned_events",
+                "unsigned": {
+                    "age": 703422
+                }
+            }
+        )));
+
+    // Amount of time to delay the response of an /event mock request, in ms.
+    let request_delay = 50;
+    let pinned_event =
+        EventFactory::new().room(&room_id).sender(*BOB).text_msg("A message").into_raw_timeline();
+    Mock::given(method("GET"))
+        .and(path_regex(r"/_matrix/client/r0/rooms/.*/event/.*"))
+        .and(header("authorization", "Bearer 1234"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(Duration::from_millis(request_delay))
+                .set_body_json(pinned_event.json()),
+        )
+        // Verify this endpoint is only called the max concurrent amount of times.
+        .expect(MAX_PINNED_EVENTS_CONCURRENT_REQUESTS as u64)
+        .mount(&server)
+        .await;
+
+    let mut sync_response_builder = SyncResponseBuilder::new();
+    let sync_settings = SyncSettings::new().timeout(Duration::from_millis(3000));
+    let json_response =
+        sync_response_builder.add_joined_room(joined_room_builder).build_json_sync_response();
+    mock_sync(&server, json_response, None).await;
+    let _ = client.sync_once(sync_settings.clone()).await;
+
+    let room = client.get_room(&room_id).unwrap();
+
+    // Start loading the pinned event timeline asynchronously.
+    let handle = tokio::spawn({
+        let timeline_builder = room
+            .timeline_builder()
+            .with_focus(TimelineFocus::PinnedEvents { max_events_to_load: 100 });
+        async {
+            let _ = timeline_builder.build().await;
+        }
+    });
+
+    // Give it time to load events. As each request takes `request_delay`, we should
+    // have exactly `MAX_PINNED_EVENTS_CONCURRENT_REQUESTS` if the max
+    // concurrency setting is honoured.
+    sleep(Duration::from_millis(request_delay / 2)).await;
+
+    // Abort handle to stop requests from being processed.
+    handle.abort();
 }
 
 struct TestHelper {
