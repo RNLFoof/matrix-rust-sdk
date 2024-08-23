@@ -26,7 +26,8 @@ use tracing::{debug, warn};
 
 use crate::timeline::event_handler::TimelineEventKind;
 
-/// The max number of concurrent `/event` requests to run when loading pinned events.
+/// The max number of concurrent `/event` requests to run when loading pinned
+/// events.
 pub const MAX_PINNED_EVENTS_CONCURRENT_REQUESTS: usize = 10;
 
 /// Utility to load the pinned events in a room.
