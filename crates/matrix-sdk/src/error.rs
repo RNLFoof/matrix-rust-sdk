@@ -44,7 +44,9 @@ use serde_json::Error as JsonError;
 use thiserror::Error;
 use url::ParseError as UrlParseError;
 
-use crate::{event_cache::EventCacheError, store_locks::LockStoreError};
+use crate::{
+    event_cache::EventCacheError, send_queue::RoomSendQueueError, store_locks::LockStoreError,
+};
 
 /// Result type of the matrix-sdk.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -379,6 +381,10 @@ pub enum Error {
     /// Backups are not enabled
     #[error("backups are not enabled")]
     BackupNotEnabled,
+
+    /// An error coming from the send queue subsystem.
+    #[error(transparent)]
+    SendQueueError(#[from] RoomSendQueueError),
 }
 
 #[rustfmt::skip] // stop rustfmt breaking the `<code>` in docs across multiple lines

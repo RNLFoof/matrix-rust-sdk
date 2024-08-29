@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use matrix_sdk::{
@@ -23,7 +23,7 @@ use ruma::{
         },
         TimelineEventType,
     },
-    EventId, Int, RoomAliasId, UserId,
+    EventId, Int, OwnedDeviceId, OwnedTransactionId, OwnedUserId, RoomAliasId, UserId,
 };
 use tokio::sync::RwLock;
 use tracing::error;
@@ -735,6 +735,57 @@ impl Room {
             .await?;
 
         self.inner.send_queue().send(replacement_event).await?;
+        Ok(())
+    }
+
+    /// Remove verification requirements for the given users and
+    /// resend messages that failed to send because their identities were no
+    /// longer verified (in response to
+    /// `SessionRecipientCollectionError::VerifiedUserChangedIdentity`)
+    pub async fn withdraw_verification_and_resend(
+        &self,
+        user_ids: Vec<String>,
+        transaction_id: String,
+    ) -> Result<(), ClientError> {
+        let transaction_id: OwnedTransactionId = transaction_id.into();
+
+        let parsing_result: Result<Vec<OwnedUserId>, _> =
+            user_ids.iter().map(UserId::parse).collect();
+
+        match parsing_result {
+            Ok(user_ids) => {
+                self.inner.withdraw_verification_and_resend(user_ids, &transaction_id).await?;
+            }
+            Err(error) => return Err(ClientError::new(error)),
+        };
+
+        Ok(())
+    }
+
+    /// Set the local trust for the given devices to `LocalTrust::Verified`
+    /// and resend messages that failed to send because said devices are
+    /// unverified (in response to
+    /// `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
+    pub async fn trust_devices_and_resend(
+        &self,
+        devices: HashMap<String, Vec<String>>,
+        transaction_id: String,
+    ) -> Result<(), ClientError> {
+        let transaction_id: OwnedTransactionId = transaction_id.into();
+
+        let mut parsed_devices: HashMap<OwnedUserId, Vec<OwnedDeviceId>> = HashMap::new();
+
+        for (user_id, device_ids) in devices.iter() {
+            let user_id = UserId::parse(user_id)?;
+
+            let device_ids: Vec<OwnedDeviceId> =
+                device_ids.iter().map(|device_id| device_id.as_str().into()).collect();
+
+            parsed_devices.insert(user_id, device_ids);
+        }
+
+        self.inner.trust_devices_and_resend(parsed_devices, &transaction_id).await?;
+
         Ok(())
     }
 }

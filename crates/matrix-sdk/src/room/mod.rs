@@ -14,6 +14,8 @@ use futures_util::{
     future::{try_join, try_join_all},
     stream::FuturesUnordered,
 };
+#[cfg(feature = "e2e-encryption")]
+use matrix_sdk_base::crypto::LocalTrust;
 use matrix_sdk_base::{
     deserialized_responses::{
         RawAnySyncOrStrippedState, RawSyncOrStrippedState, SyncOrStrippedState, TimelineEvent,
@@ -24,11 +26,6 @@ use matrix_sdk_base::{
 };
 use matrix_sdk_common::{deserialized_responses::SyncTimelineEvent, timeout::timeout};
 use mime::Mime;
-#[cfg(feature = "e2e-encryption")]
-use ruma::events::{
-    room::encrypted::OriginalSyncRoomEncryptedEvent, AnySyncMessageLikeEvent, AnySyncTimelineEvent,
-    SyncMessageLikeEvent,
-};
 use ruma::{
     api::client::{
         config::{set_global_account_data, set_room_account_data},
@@ -82,6 +79,14 @@ use ruma::{
     time::Instant,
     EventId, Int, MatrixToUri, MatrixUri, MxcUri, OwnedEventId, OwnedRoomId, OwnedServerName,
     OwnedTransactionId, OwnedUserId, RoomId, TransactionId, UInt, UserId,
+};
+#[cfg(feature = "e2e-encryption")]
+use ruma::{
+    events::{
+        room::encrypted::OriginalSyncRoomEncryptedEvent, AnySyncMessageLikeEvent,
+        AnySyncTimelineEvent, SyncMessageLikeEvent,
+    },
+    OwnedDeviceId,
 };
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -2955,6 +2960,54 @@ impl Room {
             .store()
             .remove_kv_data(StateStoreDataKey::ComposerDraft(self.room_id()))
             .await?;
+        Ok(())
+    }
+
+    /// Remove verification requirements for the given users and
+    /// resend messages that failed to send because their identities were no
+    /// longer verified (in response to
+    /// `SessionRecipientCollectionError::VerifiedUserChangedIdentity`)
+    #[cfg(feature = "e2e-encryption")]
+    pub async fn withdraw_verification_and_resend(
+        &self,
+        user_ids: Vec<OwnedUserId>,
+        transaction_id: &TransactionId,
+    ) -> Result<()> {
+        let encryption = self.client().encryption();
+
+        for user_id in user_ids {
+            if let Some(user_identity) = encryption.get_user_identity(&user_id).await? {
+                user_identity.withdraw_verification().await?;
+            }
+        }
+
+        self.send_queue().unwedge(transaction_id).await?;
+
+        Ok(())
+    }
+
+    /// Set the local trust for the given devices to `LocalTrust::Verified`
+    /// and resend messages that failed to send because said devices are
+    /// unverified (in response to
+    /// `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
+    #[cfg(feature = "e2e-encryption")]
+    pub async fn trust_devices_and_resend(
+        &self,
+        devices: HashMap<OwnedUserId, Vec<OwnedDeviceId>>,
+        transaction_id: &TransactionId,
+    ) -> Result<()> {
+        let encryption = self.client().encryption();
+
+        for user_id in devices.keys() {
+            for device_id in &devices[user_id] {
+                if let Some(device) = encryption.get_device(user_id, device_id).await? {
+                    device.set_local_trust(LocalTrust::Verified).await?;
+                }
+            }
+        }
+
+        self.send_queue().unwedge(transaction_id).await?;
+
         Ok(())
     }
 }
