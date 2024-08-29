@@ -1232,7 +1232,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn list_keywords() {
+    async fn test_list_keywords() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
 
@@ -1290,7 +1290,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn add_keyword_missing() {
+    async fn test_add_keyword_missing() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
         let settings = client.notification_settings().await;
@@ -1316,7 +1316,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn add_keyword_disabled() {
+    async fn test_add_keyword_disabled() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
 
@@ -1372,7 +1372,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn add_keyword_noop() {
+    async fn test_add_keyword_noop() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
 
@@ -1419,7 +1419,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn remove_keyword_all() {
+    async fn test_remove_keyword_all() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
 
@@ -1479,7 +1479,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn remove_keyword_noop() {
+    async fn test_remove_keyword_noop() {
         let server = MockServer::start().await;
         let client = logged_in_client(Some(server.uri())).await;
         let settings = client.notification_settings().await;
