@@ -2986,12 +2986,12 @@ impl Room {
         Ok(())
     }
 
-    /// Set the local trust for the given devices to `LocalTrust::Verified`
+    /// Set the local trust for the given devices to `LocalTrust::Ignored`
     /// and resend messages that failed to send because said devices are
     /// unverified (in response to
     /// `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
     #[cfg(feature = "e2e-encryption")]
-    pub async fn trust_devices_and_resend(
+    pub async fn ignore_device_trust_and_resend(
         &self,
         devices: HashMap<OwnedUserId, Vec<OwnedDeviceId>>,
         transaction_id: &TransactionId,
@@ -3001,7 +3001,7 @@ impl Room {
         for user_id in devices.keys() {
             for device_id in &devices[user_id] {
                 if let Some(device) = encryption.get_device(user_id, device_id).await? {
-                    device.set_local_trust(LocalTrust::Verified).await?;
+                    device.set_local_trust(LocalTrust::Ignored).await?;
                 }
             }
         }

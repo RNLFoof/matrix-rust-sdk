@@ -762,11 +762,11 @@ impl Room {
         Ok(())
     }
 
-    /// Set the local trust for the given devices to `LocalTrust::Verified`
+    /// Set the local trust for the given devices to `LocalTrust::Ignored`
     /// and resend messages that failed to send because said devices are
     /// unverified (in response to
     /// `SessionRecipientCollectionError::VerifiedUserHasUnsignedDevice`).
-    pub async fn trust_devices_and_resend(
+    pub async fn ignore_device_trust_and_resend(
         &self,
         devices: HashMap<String, Vec<String>>,
         transaction_id: String,
@@ -784,7 +784,7 @@ impl Room {
             parsed_devices.insert(user_id, device_ids);
         }
 
-        self.inner.trust_devices_and_resend(parsed_devices, &transaction_id).await?;
+        self.inner.ignore_device_trust_and_resend(parsed_devices, &transaction_id).await?;
 
         Ok(())
     }
