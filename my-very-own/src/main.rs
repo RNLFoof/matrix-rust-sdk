@@ -12,6 +12,9 @@ async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room) {
     if room.state() != RoomState::Joined {
         return;
     }
+    if event.sender.as_str() != "@rnl:cadence.moe" {
+        return;
+    }
     let MessageType::Text(text_content) = event.content.msgtype else {
         return;
     };
