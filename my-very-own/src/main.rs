@@ -3,9 +3,9 @@ use std::{env, process::exit};
 use matrix_sdk::{
     config::SyncSettings,
     ruma::events::room::message::{
-        MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
+        MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent, RoomMessageEventContentWithoutRelation
     },
-    Client, Room, RoomState,
+    Client, Room, RoomState, room::edit::EditedContent,
 };
 
 async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room) {
@@ -16,13 +16,16 @@ async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room) {
         return;
     };
 
-    if text_content.body.contains("!party") {
-        let content = RoomMessageEventContent::text_plain("🎉🎊🥳 let's PARTY!! 🥳🎊🎉");
+    if text_content.body.starts_with("v!8") || text_content.body.starts_with("v/8") {
+        let content = RoomMessageEventContent::text_plain("🤖 8");
 
         println!("sending");
 
         // send our message to the room we found the "!party" command in
-        room.send(content).await.unwrap();
+        // room.send(content).await.unwrap();
+        room.send(
+            room.make_edit_event(&event.event_id, EditedContent::RoomMessage(RoomMessageEventContentWithoutRelation::text_plain("🤖 8"))).await.unwrap()
+        ).await.unwrap();
 
         println!("message sent");
     }
